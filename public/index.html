@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <!-- ========================================== -->
+    <!-- SECCIÓN 1: CONFIGURACIÓN Y METADATOS HTML -->
+    <!-- ========================================== -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUPERPOTE - Premium</title>
+    <link rel="icon" href="data:,">
+    <!-- Librerías Externas: Socket.io, Firebase y reCAPTCHA -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.google.com/recaptcha/api.js?render=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></script>
+    
+    <!-- ========================================== -->
+    <!-- SECCIÓN 2: ESTILOS VISUALES Y DISEÑO CSS -->
+    <!-- ========================================== -->
+    <style>
+        body { 
+            background-color: #05070f; 
+            color: white; 
+            font-family: sans-serif; 
+            margin: 0; 
+            padding: 10px 0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: flex-start; 
+            min-height: 100vh; 
+            box-sizing: border-box;
+        }
+
+        .contenedor-responsive { 
+            max-width: 440px; 
+            width: 100%; 
+            background: linear-gradient(145deg, #070a13 0%, #020617 100%); 
+            padding: 24px; 
+            border-radius: 24px; 
+            text-align: center; 
+            box-shadow: 0 10px 35px rgba(0,0,0,0.9);
+            border: 1px solid #1e293b;
+            box-sizing: border-box;
+        }
+
+        .oculto { display: none !important; }
+        
+        .header-logo { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 6px; }
+        .icono-pote { font-size: 34px; filter: drop-shadow(0 0 10px #ffd700); }
+        .titulo-premium { font-size: 28px; font-weight: 900; background: linear-gradient(135deg, #ffd700 0%, #ffaa00 50%, #ffffff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 15px rgba(255,215,0,0.4); text-transform: uppercase; margin: 0; letter-spacing: 1px; }
+        .sub-tag { color: #38bdf8; font-size: 11px; margin-bottom: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
+        
+        .caja-banca { background: #020617; border: 1px solid #1e293b; border-radius: 10px; padding: 10px; margin-bottom: 10px; text-align: left; font-size: 12px; }
+        .caja-banca h4 { margin: 0 0 6px 0; color: #ffd700; text-transform: uppercase; }
+        
+        input, select { width: 100%; padding: 12px; background: #000000; color: #fff; border: 1px solid #334155; border-radius: 10px; font-size: 14px; font-weight: bold; margin-bottom: 12px; box-sizing: border-box; transition: border-color 0.3s; }
+        input:focus, select:focus { border-color: #38bdf8; outline: none; box-shadow: 0 0 8px rgba(56, 189, 248, 0.3); }
+
+        .btn-principal { width: 100%; padding: 14px; background: linear-gradient(135deg, #00ffcc, #00bfa5); color:#000; border:none; border-radius:10px; font-weight:900; font-size:14px; cursor:pointer; text-transform:uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(0,255,204,0.3); transition: transform 0.2s; }
+        .btn-principal:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,255,204,0.4); }
+        
+        .bloque-transacciones { display: flex; gap: 8px; width: 100%; margin-bottom: 10px; }
+        .btn-transaccion { flex: 1; padding: 8px; border-radius: 6px; font-weight: bold; font-size: 10px; text-transform: uppercase; border: none; cursor: pointer; color: #000; }
+        .btn-depo { background: linear-gradient(135deg, #fbbf24, #d97706); }
+        .btn-reti { background: linear-gradient(135deg, #4ade80, #16a34a); color: #fff; }
+
+        .status-banner { background: linear-gradient(90deg, #1e293b, #0f172a); border: 1px solid #3b82f6; padding: 8px; border-radius: 8px; font-weight: bold; font-size: 12px; margin-bottom: 8px; color: #38bdf8; text-transform: uppercase; }
+        
+        .paneles-saldo { display: flex; gap: 8px; margin-bottom: 10px; width: 100%; }
+        .tarjeta-saldo { flex: 1; background: #020617; border: 1px solid #1e293b; padding: 8px; border-radius: 10px; box-sizing: border-box; }
+        .tarjeta-saldo p { margin: 0; font-size: 9px; color: #4ade80; font-weight: bold; }
+        .tarjeta-saldo .monto { font-size: 16px; font-weight: bold; margin-top: 3px; color: #fff; }
+        
+        .canvas-contenedor { position: relative; width: 250px; height: 250px; margin: 10px auto; }
+        #canvas-wheel { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 0 20px rgba(0, 0, 0, 0.9); }
+        .marcador { 
+            position: absolute; 
+            top: -20px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            width: 0; 
+            height: 0; 
+            border-left: 16px solid transparent; 
+            border-right: 16px solid transparent; 
+            border-top: 42px solid #ef4444; 
+            z-index: 10; 
+            pointer-events: none;
+        }
+        
+        .centro-ganador { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%) scale(0); 
+            width: 160px; 
+            height: 160px; 
+            background: rgba(5, 7, 15, 0.96); 
+            border: 3px solid #ffd700; 
+            border-radius: 50%; 
+            z-index: 20; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 0 25px rgba(255,215,0,0.7); 
+            padding: 10px; 
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            pointer-events: none;
+            opacity: 0;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .centro-ganador.mostrar {
+            transform: translate(-50%, -50%) scale(1) !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        .historial-lista { display: flex; justify-content: center; gap: 8px; margin: 15px 0; background: #020617; padding: 8px; border-radius: 14px; border: 1px solid #1e293b; height: 38px; box-sizing: border-box; overflow: hidden; }
+        .historial-item { flex: 1; max-width: 31%; background: linear-gradient(135deg, #1e293b, #111827); padding: 4px 2px; border-radius: 8px; font-size: 11px; font-weight: bold; color: #00ffcc; border: 1px solid #334155; text-align: center; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+
+        .zona-fichas { display: flex; justify-content: center; gap: 8px; margin: 10px 0 15px 0; }
+        .ficha { 
+            width: 48px; 
+            height: 48px; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-weight: bold; 
+            font-size: 15px; 
+            color: #ffffff !important; 
+            cursor: pointer; 
+            border: 3px dashed rgba(255,255,255,0.6); 
+            transition: transform 0.1s ease;
+        }
+        .ficha:active { transform: scale(0.92); }
+        .f10 { background: #2563eb; } .f20 { background: #16a34a; } .f100 { background: #dc2626; } .f200 { background: #7c3aed; } .f500 { background: #ea580c; }
+        .ficha-activa { border: 3px solid #fff !important; transform: scale(1.15); box-shadow: 0 0 12px #fff; }
+        
+        .barra-herramientas-apuesta { display: flex; gap: 10px; width: 100%; margin-bottom: 12px; }
+        .btn-accion-casino { flex: 1; padding: 10px; border-radius: 8px; font-size: 11px; font-weight: bold; border: 1px solid #334155; color: #fff; cursor: pointer; text-transform: uppercase; background: linear-gradient(180deg, #1e293b, #0f172a); transition: transform 0.1s ease; }
+        .btn-accion-casino:active { transform: scale(0.96); }
+
+        .grid-apuestas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: #020617; padding: 6px; border-radius: 14px; max-height: none; overflow-y: visible; border: 1px solid #1e293b; }
+        .btn-apuesta { background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px 2px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; line-height: 1.2; transition: transform 0.1s ease; }
+        .btn-apuesta:active { transform: scale(0.95); }
+        .btn-apuesta span { font-size: 11px; color: #ffd700; margin-top: 2px; }
+        .btn-activo { background: #16a34a !important; border-color: #4ade80 !important; }
+        
+        .terminos-box { font-size: 11px; color: #94a3b8; text-align: left; margin: 12px 0; background: rgba(30, 41, 59, 0.4); padding: 10px; border-radius: 8px; border: 1px solid #1e293b; }
+        .terminos-box label { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+        .terminos-box input[type="checkbox"] { width: 16px; height: 16px; margin-top: 1px; accent-color: #38bdf8; cursor: pointer; }
+
+        .auth-tabs { display: flex; gap: 10px; margin-bottom: 15px; background: #020617; padding: 4px; border-radius: 10px; border: 1px solid #1e293b; }
+        .auth-tab-btn { flex: 1; padding: 10px; background: transparent; color: #64748b; border: none; border-radius: 8px; font-weight: bold; font-size: 12px; cursor: pointer; transition: all 0.3s ease; }
+        .auth-tab-btn.activo { background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-20px); }
+            15% { opacity: 1; transform: translateY(0); }
+            85% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+        .toast-notif {
+            position: fixed; top: 20px; left: 10%; width: 80%; padding: 15px;
+            color: white; border-radius: 10px; text-align: center; font-weight: bold;
+            z-index: 99999; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            animation: fadeInOut 3s ease forwards;
+        }
+    </style>
+</head>
+<body>
+    <!-- ================================================= -->
+    <!-- SECCIÓN 3: BANNER DE ESTADO Y CONEXIÓN DE SERVIDOR -->
+    <!-- ================================================= -->
+    <div id="banner-mantenimiento" style="display:none; position:fixed; top:0; left:0; width:100%; height:50px; background-color:rgba(220, 38, 38, 0.98); color:white; text-align:center; line-height:50px; font-weight:bold; z-index:9999999; pointer-events:none;">
+        ⚠️ SERVIDOR DESCONECTADO. Reconectando...
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SECCIÓN 4: BLOQUE DE AUTENTICACIÓN Y LOGIN  -->
+    <!-- ========================================== -->
+    <div class="contenedor-responsive" id="bloque-login">
+        <div class="header-logo"><span class="icono-pote">🏺</span><h1 class="titulo-premium">SUPERPOTE</h1></div>
+        <p class="sub-tag">Sistema de Registro de Confianza</p>
+        
+        <div class="auth-tabs">
+            <button onclick="cambiarPestanaAuth('LOGIN')" id="tab-login" class="auth-tab-btn activo">YA TENGO CUENTA</button>
+            <button onclick="cambiarPestanaAuth('REGISTRO')" id="tab-registro" class="auth-tab-btn">REGÍSTRATE</button>
+        </div>
+
+        <div id="campos-login">
+            <input type="text" id="cod-ingreso" placeholder="INGRESE SU NÚMERO DE TELÉFONO">
+        </div>
+
+        <div id="campos-registro" class="oculto">
+            <input type="text" id="reg-nombre" placeholder="NOMBRE Y APELLIDO COMPLETO">
+            <input type="text" id="reg-cedula" placeholder="NÚMERO DE CÉDULA (V-12345678)">
+            <input type="text" id="reg-telefono" placeholder="TELÉFONO DE PAGO MÓVIL">
+            
+            <!-- Selector Integrado de Bancos de Venezuela -->
+            <select id="reg-banco">
+                <option value="">SELECCIONE SU BANCO</option>
+                <option value="0156 - 100% Banco">0156 - 100% Banco</option>
+                <option value="0175 - Bancamiga">0175 - Bancamiga</option>
+                <option value="0128 - Bancrecer">0128 - Bancrecer</option>
+                <option value="0134 - Banesco">0134 - Banesco</option>
+                <option value="0177 - Banfanb">0177 - Banfanb</option>
+                <option value="0146 - Bangente">0146 - Bangente</option>
+                <option value="0172 - Banco Activo">0172 - Banco Activo</option>
+                <option value="0166 - Banco Agrícola de Venezuela">0166 - Banco Agrícola de Venezuela</option>
+                <option value="0174 - Banco Bicentenario del Pueblo">0174 - Banco Bicentenario del Pueblo</option>
+                <option value="0129 - Banco Caroní">0129 - Banco Caroní</option>
+                <option value="0148 - Banco de Desarrollo Económico y Social (BANDES)">0148 - Banco de Desarrollo Económico y Social (BANDES)</option>
+                <option value="0102 - Banco de Venezuela">0102 - Banco de Venezuela</option>
+                <option value="0163 - Banco del Tesoro">0163 - Banco del Tesoro</option>
+                <option value="0115 - Banco Exterior">0115 - Banco Exterior</option>
+                <option value="0173 - Banco Internacional de Desarrollo">0173 - Banco Internacional de Desarrollo</option>
+                <option value="0105 - Banco Mercantil">0105 - Banco Mercantil</option>
+                <option value="0191 - Banco Nacional de Crédito (BNC)">0191 - Banco Nacional de Crédito (BNC)</option>
+                <option value="0138 - Banco Plaza">0138 - Banco Plaza</option>
+                <option value="0108 - Banco Provincial">0108 - Banco Provincial</option>
+                <option value="0137 - Banco Sofitasa">0137 - Banco Sofitasa</option>
+                <option value="0169 - Mi Banco">0169 - Mi Banco</option>
+            </select>
+        </div>
+
+        <div class="terminos-box">
+            <label>
+                <input type="checkbox" id="check-terminos" required> 
+                <span>Acepto los <a href="#" onclick="abrirTerminos()" style="color: #38bdf8; text-decoration: none;">Términos y Privacidad</a>. Mis datos reales solo se usarán para procesar pagos y retiros seguros.</span>
+            </label>
+        </div>
+
+        <button class="btn-principal" id="btn-auth-ejecutar" onclick="procesarAutenticacion()">Entrar a Jugar</button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SECCIÓN 5: INTERFAZ PRINCIPAL DE JUEGO     -->
+    <!-- ========================================== -->
+    <div class="contenedor-responsive oculto" id="bloque-juego">
+        <div class="header-logo"><span class="icono-pote">🏺</span><h1 class="titulo-premium">SUPERPOTE</h1></div>
+        
+        <div id="reloj-apuestas" style="font-size: 20px; color: #38bdf8; font-weight: bold; margin: 10px 0; text-align: center;">
+            Tiempo para apostar: 40s
+        </div>
+
+        <div class="sub-tag" id="nombre-usuario-display">JUGADOR: -</div>
+        
+        <!-- Botones de Banca (Depósito y Retiro) -->
+        <div class="bloque-transacciones">
+            <button class="btn-transaccion btn-depo" id="btn-banca-depo" onclick="abrirModuloBanca('DEPOSITAR')">💰 DEPOSITAR</button>
+            <button class="btn-transaccion btn-reti" id="btn-banca-reti" onclick="abrirModuloBanca('RETIRAR')">💸 RETIRAR Ganancia</button>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+            <button onclick="abrirHistorialUsuario()" style="width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
+                📋 Mis Transacciones
+            </button>
+        </div>
+        
+        <!-- Módulo de Banca (Ventana Modal Interna) -->
+        <div class="caja-banca oculto" id="ventana-banca">
+            <h4 id="banca-titulo">Operación</h4>
+            <div id="banca-contenido"></div>
+            <div style="display:flex; gap:8px; margin-top:10px;">
+                <button class="btn-transaccion" style="background:#ef4444; color:#fff;" onclick="cerrarModuloBanca()">Cancelar</button>
+                <button class="btn-transaccion" style="background:#22c55e; color:#fff;" id="btn-banca-confirmar">Enviar Solicitud</button>
+            </div>
+        </div>
+
+        <div class="status-banner" id="banner-estado-mesa">🎰 Esperando jugadas...</div>
+        
+        <!-- Paneles de Saldo de Usuario y Pote Acumulado -->
+        <div class="paneles-saldo">
+            <div class="tarjeta-saldo">
+                <p>● TU SALDO</p>
+                <div class="monto"><span id="saldo-dinamico">0.00</span> Bs</div>
+            </div>
+            <div class="tarjeta-saldo" style="border-color:#f59e0b;">
+                <p style="color:#f59e0b;">🏆 POTE ACUMULADO</p>
+                <div class="monto" id="pote-dinamico">0.00 Bs</div>
+            </div>
+        </div>
+
+        <!-- Canvas de la Ruleta y Popup Central de Resultados -->
+        <div class="canvas-contenedor">
+            <div class="marcador" id="lengueta"></div>
+            <div class="centro-ganador" id="centro-popup">
+                <div style="font-size: 11px; font-weight: bold; color: #ffd700; text-transform: uppercase;" id="centro-titulo-resultado">¡SALIÓ FIGURA!</div>
+                <div style="font-size: 16px; font-weight: 900; color: #fff; margin: 4px 0;" id="centro-figura">-</div>
+                <div style="font-size: 11px; color: #4ade80; font-weight: bold;" id="centro-premio">-</div>
+            </div>
+            <canvas id="canvas-wheel" width="400" height="400"></canvas>
+        </div>
+
+        <!-- Historial de Últimas Salidas -->
+        <div class="historial-lista" id="historial-salidas"></div>
+
+        <!-- Selector de Fichas de Apuesta -->
+        <div class="zona-fichas">
+            <div class="ficha f10" onclick="cambiarFicha(10, this)">10</div>
+            <div class="ficha f20" onclick="cambiarFicha(20, this)">20</div>
+            <div class="ficha f100" onclick="cambiarFicha(100, this)">100</div>
+            <div class="ficha f200" onclick="cambiarFicha(200, this)">200</div>
+            <div class="ficha f500" onclick="cambiarFicha(500, this)">500</div>
+        </div>
+
+        <!-- Barra de Herramientas de Apuestas (Deshacer / Repetir) -->
+        <div class="barra-herramientas-apuesta">
+            <button class="btn-accion-casino" id="btn-deshacer" onclick="deshacerUltimoMovimiento()">↩ DESHACER</button>
+            <button class="btn-accion-casino" onclick="repetirUltimaJugadaMesa()">🔁 REPETIR</button>
+        </div>
+
+        <!-- Cuadrícula de Botones de Apuesta (Figuras del Sorteo) -->
+        <div class="grid-apuestas" id="contenedor-botones-apuestas"></div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SECCIÓN 6: MODAL DE HISTORIAL DE USUARIO   -->
+    <!-- ========================================== -->
+    <div id="modal-historial-usuario" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:#1e1e2f; width:90%; max-width:400px; padding:20px; border-radius:12px; border:1px solid #333; color:white; font-family:'Segoe UI', sans-serif; box-shadow:0 8px 24px rgba(0,0,0,0.6);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0; font-size:1.1rem; color:#22c55e;">Historial de Solicitudes</h3>
+                <button onclick="cerrarHistorialUsuario()" style="background:none; border:none; color:#aaa; font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+            <div id="lista-historial-usuario" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
+                <p style="text-align:center; color:#777; font-size:0.9rem;">Cargando historial...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SECCIÓN 7: LÓGICA GENERAL DE JAVASCRIPT    -->
+    <!-- ========================================== -->
+<script>
+console.log("[LOG ESPÍA] 🚀 Inicializando script principal de SUPERPOTE...");
+
+// Inicialización de Socket.io y Firebase
+const socket = io();
+const firebaseConfig = { databaseURL: "https://superpote-e3dc4-default-rtdb.firebaseio.com/" };
+firebase.initializeApp(firebaseConfig);
+const rtdb = firebase.database();
+
+// Variables Globales de Estado
+let fichaSeleccionada = 0;
+let usuarioActualId = "";
+let datosUsuarioGlobales = {};
+let valorFichaSeleccionada = 0;
+let ultimaJugada = null;
+let apuestasRealizadas = {};
+let ultimaApuestaGuardada = {};
+let modoActualAuth = "LOGIN";
+let historialApuestas = []; 
+let apuestaActual = {};     
+let listenerHistorialActivo = false;
+
+// Arrays de Sorteo y Colores
+const elementosSorteo = [
+    "Limón", "Coco", "Manzana", "Pera", "Cereza", "Durazno", "Kiwi", "Ciruela", "Mora", "Aguacate",
+    "Perro", "Gato", "León", "Tigre", "Mono", "Oso", "Zorro", "Lobo", "Águila", "Loro",
+    "Delfín", "Culebra", "Sapo", "Pez", "Toro", "Vaca", "Caballo", "Oveja", "Gallo", "Fresa"
+];
+const coloresRuletaOriginal = ["#0f172a", "#1e293b", "#020617", "#ffaa00", "#111827", "#334155"];
+
+// Sistema de Efectos Sonoros (Web Audio API corregido para reutilizar o reabrir contexto sin bloqueos)
+let sharedAudioCtx = null;
+function obtenerAudioContext() {
+    if (!sharedAudioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+            sharedAudioCtx = new AudioContextClass();
+        }
+    }
+    if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+        sharedAudioCtx.resume().catch(() => {});
+    }
+    return sharedAudioCtx;
+}
+
+function reproducirEfectoSonoro(tipo) {
+    try {
+        const audioCtx = obtenerAudioContext();
+        if (!audioCtx) return;
+
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        let tiempoActual = audioCtx.currentTime;
+
+        if (tipo === 'apuesta') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, tiempoActual);
+            gain.gain.setValueAtTime(0.08, tiempoActual);
+            gain.gain.exponentialRampToValueAtTime(0.01, tiempoActual + 0.15);
+            osc.start(tiempoActual);
+            osc.stop(tiempoActual + 0.15);
+        }
+        else if (tipo === 'exito') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(523.25, tiempoActual);
+            osc.frequency.setValueAtTime(659.25, tiempoActual + 0.1);
+            osc.frequency.setValueAtTime(783.99, tiempoActual + 0.2);
+            gain.gain.setValueAtTime(0.12, tiempoActual);
+            gain.gain.exponentialRampToValueAtTime(0.01, tiempoActual + 0.35);
+            osc.start(tiempoActual);
+            osc.stop(tiempoActual + 0.35);
+        } 
+        else if (tipo === 'error') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(220, tiempoActual);
+            osc.frequency.setValueAtTime(150, tiempoActual + 0.15);
+            gain.gain.setValueAtTime(0.12, tiempoActual);
+            gain.gain.exponentialRampToValueAtTime(0.01, tiempoActual + 0.3);
+            osc.start(tiempoActual);
+            osc.stop(tiempoActual + 0.3);
+        }
+        else if (tipo === 'pote') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, tiempoActual);
+            osc.frequency.setValueAtTime(1174.66, tiempoActual + 0.12);
+            osc.frequency.setValueAtTime(1567.98, tiempoActual + 0.24);
+            gain.gain.setValueAtTime(0.15, tiempoActual);
+            gain.gain.exponentialRampToValueAtTime(0.01, tiempoActual + 0.5);
+            osc.start(tiempoActual);
+            osc.stop(tiempoActual + 0.5);
+        }
+    } catch (e) {
+        console.warn("[LOG ESPÍA] ⚠️ Aviso WebAudio API bloqueado o no soportado:", e);
+    }
+}
+
+// Generación Dinámica de Botones del paño de apuestas
+const grid = document.getElementById('contenedor-botones-apuestas');
+grid.innerHTML = ''; 
+
+elementosSorteo.forEach(item => {
+    let btn = document.createElement('button');
+    btn.className = 'btn-apuesta';
+    btn.id = `btn-${item}`;
+    btn.innerHTML = `${item}<span id="apuesta-${item}">0 Bs</span>`;
+    btn.onclick = function() {
+        if (valorFichaSeleccionada === 0) {
+            reproducirEfectoSonoro('error');
+            console.warn("[LOG ESPÍA] ⚠️ Intento de apostar sin ficha seleccionada.");
+            alert("⚠️ Selecciona una ficha primero.");
+            return;
+        }
+        reproducirEfectoSonoro('apuesta');
+        console.log(`[LOG ESPÍA] 🎯 Clic en figura de apuesta: ${item} con ficha de ${valorFichaSeleccionada} Bs`);
+        ejecutarApuestaServidor(item, valorFichaSeleccionada);
+    };
+    grid.appendChild(btn);
+});
+
+// Escuchadores de Eventos del Socket.io y Sincronización
+socket.on('connect', () => {
+    console.log("[LOG ESPÍA] 🟢 Socket conectado exitosamente con ID:", socket.id);
+    document.getElementById('banner-mantenimiento').style.display = 'none';
+    firebase.database().ref('sistema/global/estadoJuego').once('value', (snap) => {
+        const estado = snap.val();
+        console.log("[LOG ESPÍA] 📊 Estado actual del juego recuperado de Firebase:", estado);
+        if (estado !== 'apuestas') {
+            document.querySelectorAll('.btn-apuesta').forEach(b => b.disabled = true);
+        }
+    });
+});
+
+socket.on('disconnect', (reason) => {
+    console.warn("[LOG ESPÍA] ⚠️ Socket desconectado. Motivo:", reason);
+    document.getElementById('banner-mantenimiento').style.display = 'block';
+    document.getElementById('banner-mantenimiento').innerText = "⚠️ CONEXIÓN INESTABLE. Su saldo está intacto.";
+});
+
+socket.on('connect_error', (error) => {
+    console.error("[LOG ESPÍA] ❌ Error de conexión en Socket.IO:", error);
+    document.getElementById('banner-mantenimiento').style.display = 'block';
+    document.getElementById('banner-mantenimiento').innerText = "⚠️ MICROCORTE DETECTADO. Reconectando...";
+});
+
+socket.on('tiempo-actualizado', (segundos) => {
+    const elReloj = document.getElementById('reloj-apuestas');
+    const banner = document.getElementById('banner-estado-mesa');
+    const btnDeshacer = document.getElementById('btn-deshacer');
+
+    if (elReloj) elReloj.innerText = "Tiempo para apostar: " + segundos + "s";
+    
+    if (segundos <= 0) {
+        banner.innerText = "🚫 ¡APUESTAS CERRADAS!";
+        document.querySelectorAll('.btn-apuesta').forEach(b => b.disabled = true);
+        if (btnDeshacer) btnDeshacer.disabled = true;
+    } else if (segundos <= 5) {
+        banner.innerText = "🚫 ¡APUESTAS CERRADAS!";
+        document.querySelectorAll('.btn-apuesta').forEach(b => b.disabled = true);
+        if (btnDeshacer) btnDeshacer.disabled = false;
+    } else {
+        banner.innerText = "🎰 APUESTA AHORA";
+        document.querySelectorAll('.btn-apuesta').forEach(b => b.disabled = false);
+        if (btnDeshacer) btnDeshacer.disabled = false;
+    }
+
+    if (segundos === 30) {
+        console.log("[LOG ESPÍA] 🔄 Nuevo ciclo iniciado (30s restantes). Ocultando popup ganador y limpiando mesa de forma segura.");
+        const popup = document.getElementById('centro-popup');
+        if (popup) popup.classList.remove('mostrar');
+
+        document.querySelectorAll('.btn-apuesta').forEach(b => b.classList.remove('btn-activo'));
+        document.querySelectorAll('[id^="apuesta-"]').forEach(el => el.innerText = "0 Bs");
+        
+        if (typeof sincronizarApuestasPrivadas === 'function' && usuarioActualId) {
+            sincronizarApuestasPrivadas();
+        }
+    }
+});
+
+socket.on('estado-juego', (estado) => {
+    console.log("[LOG ESPÍA] 🔄 Evento de estado de juego recibido:", estado);
+    const bannerEstado = document.getElementById('banner-estado-mesa');
+    const popup = document.getElementById('centro-popup');
+    if (estado === 'apuestas') {
+        popup.classList.remove('mostrar');
+        bannerEstado.innerText = "🎰 APUESTA AHORA";
+    } else if (estado === 'girando') {
+        bannerEstado.innerText = "🔊 ¡GIRANDO RULETA!";
+        document.querySelectorAll('.btn-apuesta').forEach(b => b.disabled = true);
+    }
+});
+
+socket.on('notificar-resultado-personal', (data) => {
+    console.log("[LOG ESPÍA] 📥 Resultado personal recibido:", data);
+    if (typeof procesarPopupResultado === 'function') {
+        procesarPopupResultado(
+            data.figuraGanadora, 
+            data.montoGanado, 
+            data.huboGanadores, 
+            data.montoTotalRepartido
+        );
+    }
+});
+
+socket.on('evento-superpote', (data) => {
+    console.log("[LOG ESPÍA] 🏆 Evento Superpote recibido:", data);
+    reproducirEfectoSonoro('pote');
+    mostrarNotificacion("🏆 " + data.mensaje + ": " + data.monto + " Bs", "success");
+    const elPote = document.getElementById('pote-dinamico');
+    if (elPote) {
+        elPote.style.transition = "transform 0.5s ease";
+        elPote.style.transform = "scale(1.2)";
+        setTimeout(() => { elPote.style.transform = "scale(1)"; }, 1000);
+    }
+});
+
+function procesarPopupResultado(figuraGanadora, montoGanado, huboGanadoresEnRonda, montoTotalRepartido) {
+    reproducirEfectoSonoro('exito');
+    
+    const popup = document.getElementById('centro-popup');
+    const tituloRes = document.getElementById('centro-titulo-resultado');
+    const figuraRes = document.getElementById('centro-figura');
+    const premioRes = document.getElementById('centro-premio');
+
+    if (popup && tituloRes && figuraRes && premioRes) {
+        figuraRes.innerText = figuraGanadora.toUpperCase();
+        tituloRes.innerText = `SALIÓ ${figuraGanadora.toUpperCase()}`;
+
+        const montoNum = Number(montoGanado) || 0;
+
+        if (montoNum > 0) {
+            premioRes.innerText = `¡Felicidades! Ganaste ${montoNum} Bs`;
+            premioRes.style.color = "#4ade80";
+        } else if (huboGanadoresEnRonda) {
+            premioRes.innerText = `Hubo ganadores. Se repartieron ${montoTotalRepartido || 0} Bs`;
+            premioRes.style.color = "#38bdf8";
+        } else {
+            premioRes.innerText = "No hubo ganador, premio se acumulan";
+            premioRes.style.color = "#f59e0b";
+        }
+
+        popup.classList.add('mostrar');
+    }
+}
+
+socket.on('notificar-ganancia-usuario', (data) => {
+    console.log("[LOG ESPÍA] 💰 Evento 'notificar-ganancia-usuario' recibido:", data);
+    if (data && data.userId === usuarioActualId) {
+        procesarPopupResultado(data.figura, data.montoGanado);
+    } else {
+        procesarPopupResultado(data.figura, 0);
+    }
+});
+
+let datosPremioPendiente = null;
+
+socket.on('iniciar-giro-visual', (data) => {
+    console.log("[LOG ESPÍA DEBUG] 🔍 Objeto completo recibido en iniciar-giro-visual:", data);
+    
+    // Combinamos los datos del giro con los datos de resultado por si ya llegaron
+    if (data) {
+        datosPremioPendiente = Object.assign({}, data, datosPremioPendiente);
+    }
+    
+    const indiceVisualSeguro = data.indiceGanador !== undefined ? data.indiceGanador : Math.floor(Math.random() * elementosSorteo.length);
+    
+    activarGiroFrenadoRealista(indiceVisualSeguro, () => {
+        // Usamos los datos combinados o respaldamos con el elemento del array según el índice
+        const infoFinal = datosPremioPendiente || data || {};
+        const figura = infoFinal.figuraGanadora || infoFinal.figura || elementosSorteo[indiceVisualSeguro];
+        
+        if (figura) {
+            const montoGanadoReal = infoFinal.tuMontoGanado || infoFinal.premio || infoFinal.gananciaUsuario || 0;
+            const huboGanadoresGeneral = infoFinal.huboGanadores !== undefined ? infoFinal.huboGanadores : (montoGanadoReal > 0);
+            
+            procesarPopupResultado(figura, montoGanadoReal, huboGanadoresGeneral, infoFinal.montoTotalRepartido);
+            
+            datosPremioPendiente = null;
+        } else {
+            console.warn("⚠️ La ruleta se detuvo, pero no se encontró 'figuraGanadora' ni 'figura' en los datos del evento.");
+        }
+    });
+});
+socket.on('resultado-ronda', (data) => {
+    console.log("[LOG ESPÍA] 🎯 Evento 'resultado-ronda' recibido:", data);
+    // Guarda los datos aquí para que estén disponibles al frenar
+    datosPremioPendiente = data; 
+});
+socket.on('ejecutar-giro', (data) => {
+    console.log("[LOG ESPÍA] 🎡 Evento 'ejecutar-giro' recibido. Índice ganador:", data.indiceGanador);
+    activarGiroFrenadoRealista(data.indiceGanador);
+});
+
+socket.on('actualizar-apuestas', (data) => {
+    console.log("[LOG ESPÍA] 📋 Actualizando montos de apuestas globales en la mesa:", data);
+    elementosSorteo.forEach(figura => {
+        const btn = document.getElementById(`btn-${figura}`);
+        if (!btn) return;
+        const monto = data[figura] || 0;
+        const spanMonto = btn.querySelector(`#apuesta-${figura}`);
+        
+        if (spanMonto) {
+            spanMonto.innerText = `${monto} Bs`;
+        }
+
+        if (monto > 0) {
+            btn.classList.add('btn-activo');
+        } else {
+            btn.classList.remove('btn-activo');
+        }
+    });
+});
+
+const obtenerURLServidor = () => {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        return "http://localhost:3000";
+    }
+    return ""; 
+};
+
+async function ejecutarApuestaServidor(figura, monto) {
+    if (monto === 0) {
+        reproducirEfectoSonoro('error');
+        return alert("⚠️ Selecciona una ficha primero.");
+    }
+    
+    const datosEnvio = {
+        userId: usuarioActualId,
+        monto: monto,
+        figura: figura
+    };
+
+    console.log("[LOG ESPÍA] 📤 Enviando apuesta al servidor:", datosEnvio);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+        const response = await fetch(`${obtenerURLServidor()}/realizar-apuesta`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(datosEnvio),
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+        console.log("[LOG ESPÍA] 📥 Respuesta recibida de /realizar-apuesta:", response.status, data);
+        
+        if (response.ok) {
+            ultimaJugada = { figura, monto }; 
+        } else {
+            reproducirEfectoSonoro('error');
+            mostrarNotificacion("⚠️ " + (data.error || "Error al apostar"), "error");
+        }
+    } catch (e) { 
+        clearTimeout(timeoutId);
+        console.error("[LOG ESPÍA] ❌ Error crítico de red al realizar apuesta:", e);
+        reproducirEfectoSonoro('error');
+        mostrarNotificacion("⚠️ Microcorte detectado: Su apuesta no se procesó y su saldo está intacto.", "error");
+    }
+}
+
+function repetirUltimaJugadaMesa() {
+    if (!ultimaJugada) {
+        reproducirEfectoSonoro('error');
+        console.warn("[LOG ESPÍA] ⚠️ Intento de repetir jugada sin registro previo.");
+        return alert("⚠️ No hay jugada previa.");
+    }
+    reproducirEfectoSonoro('apuesta');
+    console.log("[LOG ESPÍA] 🔁 Repitiendo última jugada:", ultimaJugada);
+    ejecutarApuestaServidor(ultimaJugada.figura, ultimaJugada.monto);
+}
+
+function cambiarPestanaAuth(modo) {
+    modoActualAuth = modo;
+    console.log("[LOG ESPÍA] 🔀 Cambiando pestaña de autenticación a:", modo);
+    if(modo === "LOGIN") {
+        document.getElementById('tab-login').style.background = "#1e293b"; document.getElementById('tab-login').style.color = "#fff";
+        document.getElementById('tab-registro').style.background = "#020617"; document.getElementById('tab-registro').style.color = "#64748b";
+        document.getElementById('campos-login').classList.remove('oculto');
+        document.getElementById('campos-registro').classList.add('oculto');
+    } else {
+        document.getElementById('tab-registro').style.background = "#1e293b"; document.getElementById('tab-registro').style.color = "#fff";
+        document.getElementById('tab-login').style.background = "#020617"; document.getElementById('tab-login').style.color = "#64748b";
+        document.getElementById('campos-login').classList.add('oculto');
+        document.getElementById('campos-registro').classList.remove('oculto');
+    }
+}
+
+function procesarAutenticacion() {
+    let aceptaTerminos = document.getElementById('check-terminos').checked;
+    if (!aceptaTerminos) {
+        reproducirEfectoSonoro('error');
+        console.warn("[LOG ESPÍA] ⚠️ Intento de acceso sin aceptar términos y condiciones.");
+        return alert("⚠️ Debes aceptar los términos y el uso de datos para continuar.");
+    }
+
+    grecaptcha.ready(function() {
+        grecaptcha.execute('6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI', {action: 'submit'}).then(function(token) {
+            console.log("[LOG ESPÍA] ✅ reCAPTCHA verificado correctamente.");
+            ejecutarLogicaAutenticacionReal();
+        });
+    });
+}
+
+function ejecutarLogicaAutenticacionReal() {
+    if(modoActualAuth === "LOGIN") {
+        let datoIngresado = document.getElementById('cod-ingreso').value.trim().toLowerCase();
+        if(!datoIngresado) {
+            reproducirEfectoSonoro('error');
+            return alert("Ingrese su número de teléfono o código.");
+        }
+
+        console.log("[LOG ESPÍA] 🔍 Solicitando autenticación al servidor para:", datoIngresado);
+        
+        fetch(`${obtenerURLServidor()}/login-usuario`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dato: datoIngresado })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success && data.userId) {
+                console.log("[LOG ESPÍA] ✅ Usuario autenticado por el servidor con ID:", data.userId);
+                reproducirEfectoSonoro('exito');
+                arrancarJuego(data.userId);
+            } else {
+                console.warn("[LOG ESPÍA] ❌ Usuario no encontrado o credenciales inválidas.");
+                reproducirEfectoSonoro('error');
+                alert(data.error || "El usuario o teléfono no existe.");
+            }
+        })
+        .catch(err => {
+            console.error("[LOG ESPÍA] ❌ Error de red al iniciar sesión:", err);
+            reproducirEfectoSonoro('error');
+            alert("Error de conexión con el servidor.");
+        });
+
+    } else {
+        let nombre = document.getElementById('reg-nombre').value.trim();
+        let bancoRaw = document.getElementById('reg-banco').value;
+        let cedula = document.getElementById('reg-cedula').value.trim();
+        let tel = document.getElementById('reg-telefono').value.trim();
+        
+        if(!nombre || !bancoRaw || !cedula || !tel) {
+            reproducirEfectoSonoro('error');
+            return alert("Por favor complete todos sus datos reales incluyendo el banco.");
+        }
+        
+        let bancoNormalizado = bancoRaw.toUpperCase().replace("BANCO ", "").trim();
+        let idGenerado = nombre.toLowerCase().replace(/\s+/g, '') + "_" + tel.slice(-4);
+
+        console.log("[LOG ESPÍA] 📝 Registrando nuevo usuario en Firebase con ID:", idGenerado);
+        rtdb.ref(`sistema/usuarios/${idGenerado}`).set({
+            nombre: nombre,
+            banco: bancoNormalizado, 
+            cedula: cedula,
+            telefono: tel,
+            saldo: 0
+        }, (error) => {
+            if(!error) {
+                console.log("[LOG ESPÍA] ✅ Registro guardado exitosamente.");
+                reproducirEfectoSonoro('exito');
+                alert(`¡Registro Exitoso! Tu ID único es: ${idGenerado}`);
+                arrancarJuego(idGenerado);
+            } else {
+                console.error("[LOG ESPÍA] ❌ Error al registrar usuario:", error);
+                reproducirEfectoSonoro('error');
+            }
+        });
+    }
+}
+
+function arrancarJuego(idUsuario) {
+    usuarioActualId = idUsuario;
+    console.log("[LOG ESPÍA] 🎮 Arrancando interfaz de juego para el usuario ID:", usuarioActualId);
+
+    let refEstadoUsuario = rtdb.ref(`sistema/usuarios/${usuarioActualId}/online`);
+    refEstadoUsuario.set(true);
+    refEstadoUsuario.onDisconnect().set(false);
+    socket.emit('usuario_conecta', usuarioActualId); 
+    
+    document.getElementById('bloque-login').classList.add('oculto');
+    document.getElementById('bloque-juego').classList.remove('oculto');
+
+    sincronizarApuestasPrivadas();
+
+    rtdb.ref(`sistema/usuarios/${usuarioActualId}/saldo`).on('value', (snap) => {
+        let nuevoSaldo = parseFloat(snap.val() || 0);
+        console.log("[LOG ESPÍA] 💰 Saldo actualizado en tiempo real:", nuevoSaldo);
+        let elSaldo = document.getElementById('saldo-dinamico');
+        if (elSaldo) {
+            elSaldo.innerText = (nuevoSaldo).toFixed(2);
+        }
+    });
+
+    rtdb.ref(`sistema/usuarios/${usuarioActualId}`).once('value', (snap) => {
+        let datos = snap.val() || {};
+        if (datos.nombre) {
+            document.getElementById('nombre-usuario-display').innerText = `JUGADOR: ${datos.nombre.toUpperCase()}`;
+        }
+    });
+            
+    rtdb.ref('sistema/global/pote').on('value', (snap) => { 
+        let valorPote = snap.val() || 0;
+        let el = document.getElementById('pote-dinamico'); 
+        if(el) {
+            el.innerText = parseFloat(valorPote).toLocaleString() + " Bs";
+        }
+    });
+
+    rtdb.ref('sistema/historial').limitToLast(3).on('value', (snapshot) => {
+        if (!snapshot.exists()) return;
+        let lista = document.getElementById('historial-salidas');
+        if (!lista) return;
+        lista.innerHTML = "";
+        
+        let itemsArray = [];
+        snapshot.forEach((child) => {
+            itemsArray.push(child.val().resultado);
+        });
+
+        itemsArray.reverse().forEach(resGanador => {
+            let nuevoItem = document.createElement('div');
+            nuevoItem.className = 'historial-item';
+            nuevoItem.innerText = resGanador;
+            lista.appendChild(nuevoItem);
+        });
+    });
+
+    generarGraficoRuleta(0);
+}
+
+function abrirModuloBanca(tipo) {
+    reproducirEfectoSonoro('apuesta');
+    console.log("[LOG ESPÍA] 🏦 Abriendo módulo de banca:", tipo);
+    let ventana = document.getElementById('ventana-banca');
+    let titulo = document.getElementById('banca-titulo');
+    let contenido = document.getElementById('banca-contenido');
+    let btnConfirmar = document.getElementById('btn-banca-confirmar');
+    
+    ventana.classList.remove('oculto');
+    
+    if(tipo === 'DEPOSITAR') {
+        titulo.innerText = "📥 REPORTAR PAGO MÓVIL";
+        contenido.innerHTML = `
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                <p style="margin:0; font-size: 11px; color: #f59e0b; font-weight: bold;">⚠️ REGLA: Depósito mínimo permitido es de 50 Bs.</p>
+            </div>
+            <div style="background: #020617; padding: 10px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 10px; text-align: left;">
+                <p style="color:#fff; margin:0; font-size: 12px;">🏦 <b>Banco:</b> Banco de Venezuela</p>
+                <p style="color:#fff; margin:0; font-size: 12px;">📱 <b>Teléfono:</b> 04248532492</p>
+                <p style="color:#fff; margin:0; font-size: 12px;">🆔 <b>Cédula:</b> 21066477</p>
+            </div>
+            <select id="banca-banco-emisor" style="margin-bottom:10px;">
+                <option value="">BANCO DESDE EL QUE PAGASTE</option>
+                <option value="0156 - 100% Banco">0156 - 100% Banco</option>
+                <option value="0175 - Bancamiga">0175 - Bancamiga</option>
+                <option value="0128 - Bancrecer">0128 - Bancrecer</option>
+                <option value="0134 - Banesco">0134 - Banesco</option>
+                <option value="0177 - Banfanb">0177 - Banfanb</option>
+                <option value="0146 - Bangente">0146 - Bangente</option>
+                <option value="0172 - Banco Activo">0172 - Banco Activo</option>
+                <option value="0166 - Banco Agrícola de Venezuela">0166 - Banco Agrícola de Venezuela</option>
+                <option value="0174 - Banco Bicentenario del Pueblo">0174 - Banco Bicentenario del Pueblo</option>
+                <option value="0129 - Banco Caroní">0129 - Banco Caroní</option>
+                <option value="0148 - BANDES">0148 - BANDES</option>
+                <option value="0102 - Banco de Venezuela">0102 - Banco de Venezuela</option>
+                <option value="0163 - Banco del Tesoro">0163 - Banco del Tesoro</option>
+                <option value="0115 - Banco Exterior">0115 - Banco Exterior</option>
+                <option value="0105 - Banco Mercantil">0105 - Banco Mercantil</option>
+                <option value="0191 - BNC">0191 - BNC</option>
+                <option value="0138 - Banco Plaza">0138 - Banco Plaza</option>
+                <option value="0108 - Banco Provincial">0108 - Banco Provincial</option>
+                <option value="0137 - Banco Sofitasa">0137 - Banco Sofitasa</option>
+                <option value="0169 - Mi Banco">0169 - Mi Banco</option>
+            </select>
+            <input type="number" id="banca-monto" placeholder="Monto depositado en Bs" required min="1">
+            <input type="text" id="banca-ref" placeholder="Últimos 4 dígitos de referencia" required maxlength="4" pattern="\\d{4}">
+        `;
+        btnConfirmar.onclick = () => enviarSolicitudDepositoServidor();
+    } else {
+        titulo.innerText = "📤 SOLICITAR RETIRO";
+        contenido.innerHTML = `
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                <p style="margin:0; font-size: 11px; color: #ef4444; font-weight: bold;">⚠️ REGLA: Retiro máximo permitido es de 50,000 Bs.</p>
+            </div>
+            <p style="color:#4ade80; margin:0 0 10px 0; font-size: 12px;">El retiro se enviará al banco y datos registrados en tu perfil.</p>
+            <input type="number" id="banca-monto" placeholder="Monto a retirar en Bs" required min="1">
+        `;
+        btnConfirmar.onclick = () => enviarTransaccionBanca('RETIRAR');
+    }
+}
+
+function cerrarModuloBanca() {
+    reproducirEfectoSonoro('apuesta');
+    document.getElementById('ventana-banca').classList.add('oculto');
+}
+
+function mostrarNotificacion(mensaje, tipo = "success") {
+    console.log(`[LOG ESPÍA] 🔔 Notificación [${tipo}]:`, mensaje);
+    let div = document.createElement('div');
+    div.className = 'toast-notif';
+    div.style.background = tipo === 'success' ? '#22c55e' : '#ef4444';
+    div.innerText = mensaje;
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 3000);
+}
+
+async function enviarSolicitudDepositoServidor() {
+    let inputMonto = document.getElementById('banca-monto');
+    let inputRef = document.getElementById('banca-ref');
+    let selectBanco = document.getElementById('banca-banco-emisor');
+    
+    let monto = parseFloat(inputMonto.value);
+    let referencia = inputRef ? inputRef.value.trim() : "";
+    let bancoEmisor = selectBanco ? selectBanco.value : "";
+
+    if (!bancoEmisor) {
+        reproducirEfectoSonoro('error');
+        return mostrarNotificacion("⚠️ Selecciona el banco desde el que realizaste el pago.", "error");
+    }
+
+    if (!/^\d{4}$/.test(referencia)) {
+        reproducirEfectoSonoro('error');
+        return mostrarNotificacion("⚠️ Ingrese los 4 dígitos de la referencia.", "error");
+    }
+
+    if (isNaN(monto) || monto <= 0) {
+        reproducirEfectoSonoro('error');
+        return mostrarNotificacion("❌ Ingrese un monto válido.", "error");
+    }
+
+    let textoDisplay = document.getElementById('nombre-usuario-display').innerText;
+    let nombreUsuario = textoDisplay.replace("JUGADOR:", "").trim();
+    if (!nombreUsuario || nombreUsuario === "-") nombreUsuario = "Usuario";
+
+    console.log("[LOG ESPÍA] 📤 Enviando solicitud de depósito:", { userId: usuarioActualId, monto, referencia, bancoEmisor });
+
+    try {
+        const response = await fetch(`${obtenerURLServidor()}/solicitar-deposito`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: usuarioActualId, nombre: nombreUsuario, monto: monto, referencia: referencia, banco: bancoEmisor })
+        });
+
+        const data = await response.json();
+        console.log("[LOG ESPÍA] 📥 Respuesta de /solicitar-deposito:", response.status, data);
+
+        if (response.ok) {
+            reproducirEfectoSonoro('exito');
+            mostrarNotificacion("✅ Solicitud enviada con éxito.", "success");
+            cerrarModuloBanca();
+        } else {
+            reproducirEfectoSonoro('error');
+            mostrarNotificacion("❌ " + (data.error || "Error al procesar"), "error");
+        }
+    } catch (error) {
+        console.error("[LOG ESPÍA] ❌ Error de red al solicitar depósito:", error);
+        reproducirEfectoSonoro('error');
+        mostrarNotificacion("❌ Error de conexión con el servidor", "error");
+    }
+}
+
+async function enviarTransaccionBanca(tipo) {
+    let inputMonto = document.getElementById('banca-monto');
+    let monto = parseFloat(inputMonto.value);
+    
+    if (isNaN(monto) || monto < 50) {
+        reproducirEfectoSonoro('error');
+        return mostrarNotificacion("❌ Mínimo 50 Bs", "error");
+    }
+
+    const snapUser = await rtdb.ref(`sistema/usuarios/${usuarioActualId}`).once('value');
+    const datosUser = snapUser.val();
+    
+    if (!datosUser) {
+        reproducirEfectoSonoro('error');
+        return mostrarNotificacion("❌ Error: No se encontraron tus datos.", "error");
+    }
+
+    if (tipo === 'RETIRAR' && monto > (parseFloat(datosUser.saldo) || 0)) {
+        reproducirEfectoSonoro('error');
+        return mostrarNotificacion("❌ SALDO INSUFICIENTE.", "error");
+    }
+    
+    let nuevaSolicitud = {
+        usuarioId: usuarioActualId,
+        nombre: datosUser.nombre, 
+        cedula: datosUser.cedula,
+        telefono: datosUser.telefono,
+        banco: datosUser.banco, 
+        monto: monto,
+        tipo: tipo,
+        referencia: "N/A",
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+    };
+
+    console.log("[LOG ESPÍA] 📤 Registrando transacción de retiro en Firebase:", nuevaSolicitud);
+
+    if (tipo === 'RETIRAR') {
+        rtdb.ref(`sistema/usuarios/${usuarioActualId}/saldo`).transaction(s => s - monto);
+    }
+
+    rtdb.ref('sistema/depositos_pendientes').push(nuevaSolicitud, (error) => {
+        if (!error) {
+            reproducirEfectoSonoro('exito');
+            mostrarNotificacion("✅ Solicitud enviada correctamente.");
+            cerrarModuloBanca();
+        } else {
+            console.error("[LOG ESPÍA] ❌ Error al enviar solicitud de retiro:", error);
+            reproducirEfectoSonoro('error');
+        }
+    });
+} 
+
+function abrirHistorialUsuario() {
+    reproducirEfectoSonoro('apuesta');
+    document.getElementById('modal-historial-usuario').style.display = 'flex';
+    cargarDatosHistorialUsuario();
+}
+
+function cerrarHistorialUsuario() {
+    reproducirEfectoSonoro('apuesta');
+    document.getElementById('modal-historial-usuario').style.display = 'none';
+}
+
+function cargarDatosHistorialUsuario() {
+    let contenedor = document.getElementById('lista-historial-usuario');
+    
+    rtdb.ref('sistema/depositos_pendientes').orderByChild('usuarioId').equalTo(usuarioActualId).on('value', (snapshot) => {
+        contenedor.innerHTML = "";
+        if (!snapshot.exists()) {
+            contenedor.innerHTML = `<p style="text-align:center; color:#888; font-size:0.9rem; padding:20px 0;">No tienes solicitudes activas en este momento.</p>`;
+            return;
+        }
+
+        snapshot.forEach((childSnapshot) => {
+            let item = childSnapshot.val();
+            let div = document.createElement('div');
+            div.style.cssText = `background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:8px; border-left:4px solid #eab308; font-size:0.85rem;`;
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:4px;">
+                    <span>${item.tipo || 'DEPÓSITO'}</span>
+                    <span style="color:#eab308;">⏳ Pendiente</span>
+                </div>
+                <div style="color:#ccc;">Monto: <b>${item.monto} Bs</b></div>
+                <div style="color:#888; font-size:0.75rem;">Ref: ${item.referencia || 'N/A'} | Banco: ${item.banco || 'N/A'}</div>
+            `;
+            contenedor.appendChild(div);
+        });
+    });
+}
+
+const canvas = document.getElementById('canvas-wheel'); 
+const ctx = canvas ? canvas.getContext('2d') : null;
+
+function generarGraficoRuleta(anguloBase) {
+    if (!ctx) return;
+    const totalGajos = elementosSorteo.length; 
+    const arco = (Math.PI * 2) / totalGajos;
+    ctx.clearRect(0, 0, 400, 400);
+    for (let i = 0; i < totalGajos; i++) {
+        let anguloGajo = anguloBase + (i * arco);
+        ctx.fillStyle = coloresRuletaOriginal[i % coloresRuletaOriginal.length];
+        ctx.beginPath(); 
+        ctx.moveTo(200, 200);
+        ctx.arc(200, 200, 190, anguloGajo, anguloGajo + arco);
+        ctx.closePath(); 
+        ctx.fill();
+        ctx.save(); 
+        ctx.translate(200, 200); 
+        ctx.rotate(anguloGajo + (arco / 2));
+        ctx.textAlign = "right"; 
+        ctx.font = "bold 18px sans-serif";
+        ctx.fillStyle = "#ffffff"; 
+        ctx.fillText(elementosSorteo[i], 175, 4); 
+        ctx.restore();
+    }
+    ctx.beginPath(); 
+    ctx.arc(200, 200, 190, 0, Math.PI * 2); 
+    ctx.strokeStyle = "#ffd700"; 
+    ctx.lineWidth = 5; 
+    ctx.stroke();
+}
+
+function playTick() {
+    try {
+        const audioCtxTick = obtenerAudioContext();
+        if (!audioCtxTick) return;
+        let osc = audioCtxTick.createOscillator();
+        let gain = audioCtxTick.createGain();
+        osc.connect(gain); 
+        gain.connect(audioCtxTick.destination);
+        osc.frequency.setValueAtTime(600, audioCtxTick.currentTime);
+        gain.gain.setValueAtTime(0.04, audioCtxTick.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtxTick.currentTime + 0.05);
+        osc.start(); 
+        osc.stop(audioCtxTick.currentTime + 0.05);
+    } catch(e) {}
+}
+
+function cambiarFicha(valor, elemento) {
+    reproducirEfectoSonoro('apuesta');
+    fichaSeleccionada = valor;
+    valorFichaSeleccionada = valor; 
+    console.log("[LOG ESPÍA] 🪙 Ficha seleccionada:", valor);
+    document.querySelectorAll('.ficha').forEach(f => f.classList.remove('ficha-activa'));
+    elemento.classList.add('ficha-activa');
+}
+
+function activarGiroFrenadoRealista(indiceObjetivo, onTerminado) {
+    const totalGajos = elementosSorteo.length; 
+    const arco = (Math.PI * 2) / totalGajos;
+    let anguloDestino = (Math.PI * 3 / 2) - (indiceObjetivo * arco) - (arco / 2);
+    let anguloFinal = anguloDestino + ((Math.PI * 2) * 6);
+    let anguloActual = 0; let tiempoInicio = null; let duracion = 7000;
+    
+    document.getElementById('centro-popup').classList.remove('mostrar');
+    document.getElementById('banner-estado-mesa').innerText = "🔊 ¡GIRANDO RULETA SUERTE!";
+
+    function cuadroAnimacion(timestamp) {
+        if (!tiempoInicio) tiempoInicio = timestamp;
+        let transcurrido = timestamp - tiempoInicio;
+        
+        if (Math.floor(transcurrido / 150) % 2 === 0) playTick();
+
+        if (transcurrido < duracion) {
+            anguloActual = ((transcurrido/duracion - 1) ** 3 + 1) * anguloFinal;
+            generarGraficoRuleta(anguloActual);
+            requestAnimationFrame(cuadroAnimacion);
+        } else {
+            generarGraficoRuleta(anguloFinal);
+            let ganador = elementosSorteo[indiceObjetivo];
+            console.log("[LOG ESPÍA] 🛑 Ruleta detenida en ganador:", ganador);
+
+            if (typeof onTerminado === 'function') {
+                onTerminado();
+            }
+        }
+    }
+    requestAnimationFrame(cuadroAnimacion);
+}
+
+async function deshacerUltimoMovimiento() {
+    if (!usuarioActualId) return;
+    reproducirEfectoSonoro('apuesta');
+    console.log("[LOG ESPÍA] ↩ Solicitando deshacer última apuesta...");
+    
+    try {
+        const response = await fetch(`${obtenerURLServidor()}/deshacer-apuesta`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: usuarioActualId })
+        });
+
+        const data = await response.json();
+        console.log("[LOG ESPÍA] 📥 Respuesta de /deshacer-apuesta:", response.status, data);
+
+        if (!data.success) {
+            reproducirEfectoSonoro('error');
+            mostrarNotificacion("⚠️ No se puede deshacer en este momento.", "error");
+        }
+    } catch (error) {
+        console.error("[LOG ESPÍA] ❌ Error de red al deshacer apuesta:", error);
+        reproducirEfectoSonoro('error');
+        mostrarNotificacion("⚠️ Microcorte detectado: No se pudo procesar la acción.", "error");
+    }
+}
+
+function sincronizarApuestasPrivadas() {
+    if (!usuarioActualId) return;
+    
+    firebase.database().ref(`sistema/usuarios/${usuarioActualId}/historialApuestas`).on('value', (snapshot) => {
+        const misApuestas = snapshot.val() || {};
+        
+        elementosSorteo.forEach(figura => {
+            const btn = document.getElementById(`btn-${figura}`);
+            if (!btn) return;
+            const spanMonto = btn.querySelector(`#apuesta-${figura}`);
+            if (spanMonto) spanMonto.innerText = "0 Bs";
+            btn.classList.remove('btn-activo');
+        });
+
+        Object.values(misApuestas).forEach(apuesta => {
+            const btn = document.getElementById(`btn-${apuesta.figura}`);
+            if (!btn) return;
+            const spanMonto = btn.querySelector(`#apuesta-${apuesta.figura}`);
+            if (spanMonto) {
+                spanMonto.innerText = `${apuesta.monto} Bs`;
+            }
+            btn.classList.add('btn-activo');
+        });
+    });
+}
+
+window.addEventListener('beforeunload', () => {
+    if (usuarioActualId) {
+        console.log("[LOG ESPÍA] 🚪 Usuario desconectando de la sesión:", usuarioActualId);
+        navigator.sendBeacon(`${obtenerURLServidor()}/usuario-desconecta`, JSON.stringify({ userId: usuarioActualId }));
+    }
+});
+</script>
+</body>
+</html>

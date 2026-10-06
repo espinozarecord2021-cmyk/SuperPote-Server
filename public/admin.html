@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>PANEL MAESTRO - SUPERPOTE</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- Librería para el Gráfico de Crecimiento -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --bg: #05070f; --card: #0f172a; --accent: #38bdf8; --text: #e2e8f0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px; }
+        .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .card { background: var(--card); padding: 12px; border-radius: 10px; border: 1px solid #1e293b; }
+        .valor { font-size: 1.3rem; font-weight: bold; color: #fff; }
+        .btn-accion { padding: 6px 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; }
+        #estado-conexion { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: inline-block; margin-bottom: 8px; }
+        
+        /* Contenedores en dos columnas (para Control y Gráfico) */
+        .panel-columnas-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        @media (max-width: 1024px) { .panel-columnas-2 { grid-template-columns: 1fr; } }
+
+        /* Contenedores en tres columnas (para Solicitudes, Saldos y Logs) */
+        .panel-columnas-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        @media (max-width: 1200px) { .panel-columnas-3 { grid-template-columns: 1fr; } }
+
+        /* Contenedores con scroll interno fijo */
+        .scroll-box { max-height: 220px; overflow-y: auto; margin-top: 8px; border: 1px solid #1e293b; border-radius: 6px; padding: 5px; }
+        
+        /* Estilos tabla usuarios */
+        .tabla-usuarios { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .tabla-usuarios th, .tabla-usuarios td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #1e293b; }
+        .tabla-usuarios th { color: var(--accent); background: #020617; position: sticky; top: 0; z-index: 1; }
+        
+        .badge-estado { padding: 2px 5px; border-radius: 4px; font-size: 0.65rem; font-weight: bold; }
+        .badge-online { background: #22c55e; color: white; }
+        .badge-offline { background: #64748b; color: white; }
+
+        /* Consola de logs */
+        .log-container { background: #020617; border: 1px solid #1e293b; border-radius: 6px; padding: 8px; height: 220px; overflow-y: auto; font-family: monospace; font-size: 0.7rem; color: #38bdf8; margin-top: 8px; }
+        .log-entry { margin-bottom: 3px; border-bottom: 1px solid #0f172a; padding-bottom: 2px; }
+        .log-error { color: #ef4444; }
+        .log-success { color: #22c55e; }
+        .log-info { color: #eab308; }
+    </style>
+</head>
+<body>
+
+<div id="login-admin" style="text-align:center; margin-top:100px;">
+    <h2>🔐 ACCESO MAESTRO</h2>
+    <input type="password" id="pass-admin" placeholder="••••••" onkeydown="if(event.key === 'Enter') verificarAcceso();" style="padding: 8px; font-size: 1rem; border-radius: 6px; border: 1px solid #1e293b; background: #0f172a; color: white; outline: none;">
+    <button onclick="verificarAcceso()" class="btn-accion" style="background: var(--accent); margin-left: 5px;">INGRESAR</button>
+</div>
+
+<div id="contenido-admin" style="display:none;">
+    <h1 style="margin:0 0 5px 0; font-size:1.3rem;">🛡️ PANEL MAESTRO</h1>
+    
+    <div id="estado-conexion" style="background: #eab308; color: black;">🔄 Conectando con Firebase...</div>
+
+    <!-- Estadísticas Rápidas -->
+    <div class="grid-stats">
+        <div class="card"><h3 style="margin:0 0 3px 0; font-size:0.8rem;">POTE ACUMULADO</h3><div id="stat-pote" class="valor">0 Bs</div></div>
+        <div class="card"><h3 style="margin:0 0 3px 0; font-size:0.8rem;">BÓVEDA CASA</h3><div id="stat-boveda" class="valor">0 Bs</div></div>
+        <div class="card"><h3 style="margin:0 0 3px 0; font-size:0.8rem;">USUARIOS ONLINE</h3><div id="stat-online" class="valor">0</div></div>
+    </div>
+
+    <!-- Fila 1: Control de Juego y Gráfico de Escalabilidad -->
+    <div class="panel-columnas-2">
+        <div class="card">
+            <h3 style="margin:0 0 6px 0; font-size:0.85rem;">⚙️ CONTROL DE JUEGO</h3>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <select id="select-ganador" style="padding: 5px; font-size:0.8rem;"></select>
+                <button onclick="forzarGiro(true)" class="btn-accion" style="background:var(--accent); font-size:0.75rem;">GIRO DIRIGIDO</button>
+                <button onclick="forzarGiro(false)" class="btn-accion" style="background:#f59e0b; font-size:0.75rem;">ALEATORIO</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin:0 0 4px 0; font-size:0.85rem;">📈 ESCALABILIDAD DIARIA DEL JUEGO</h3>
+            <div style="height: 42px;">
+                <canvas id="graficoCrecimiento"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fila 2: Gestión de Solicitudes, Auditoría de Saldos y Logs (3 Columnas Verticales) -->
+    <div class="panel-columnas-3">
+        <!-- Columna 1: Solicitudes -->
+        <div class="card">
+            <h3 style="margin:0; font-size:0.85rem;">📥 SOLICITUDES <span id="contador-solicitudes" style="font-size:0.75rem; color:var(--accent);">(0)</span></h3>
+            <div class="scroll-box" id="lista-transacciones">
+                <p style="color:#64748b; text-align:center; font-size:0.75rem; margin:10px 0;">No hay solicitudes pendientes.</p>
+            </div>
+        </div>
+
+        <!-- Columna 2: Auditoría de Saldos -->
+        <div class="card">
+            <h3 style="margin:0; font-size:0.85rem;">👥 AUDITORÍA DE SALDOS</h3>
+            <div class="scroll-box">
+                <table class="tabla-usuarios">
+                    <thead>
+                        <tr>
+                            <th>ID / Usuario</th>
+                            <th>Estado</th>
+                            <th>Saldo Actual</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-lista-usuarios">
+                        <tr><td colspan="3" style="text-align:center; color:#64748b;">Cargando usuarios...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Columna 3: Logs y Espías -->
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:0.85rem;">🕵️‍♂️ LOGS Y ESPÍAS</h3>
+                <button onclick="limpiarLogs()" style="background:transparent; border:1px solid #475569; color:#94a3b8; padding:2px 6px; border-radius:4px; cursor:pointer; font-size:0.65rem;">Limpiar</button>
+            </div>
+            <div id="consola-logs" class="log-container">
+                <div class="log-entry log-info">[SISTEMA] Consola inicializada...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let chartCrecimiento;
+    function inicializarGrafico() {
+        const ctx = document.getElementById('graficoCrecimiento').getContext('2d');
+        chartCrecimiento = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+                datasets: [{
+                    label: 'Crecimiento de Pote',
+                    data: [1200, 1500, 1400, 1800, 1750, 1896, 2100],
+                    borderColor: '#38bdf8',
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    tension: 0.3,
+                    fill: true,
+                    backgroundColor: 'rgba(56, 189, 248, 0.05)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { display: false } },
+                    y: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#1e293b' } }
+                }
+            }
+        });
+    }
+
+    function reproducirAlertaSonora() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        } catch (e) {}
+    }
+
+    function registrarLog(mensaje, tipo = 'info') {
+        const consola = document.getElementById('consola-logs');
+        if (!consola) return;
+        const timestamp = new Date().toLocaleTimeString();
+        let claseColor = 'log-info';
+        if (tipo === 'error') claseColor = 'log-error';
+        if (tipo === 'success') claseColor = 'log-success';
+
+        const div = document.createElement('div');
+        div.className = `log-entry ${claseColor}`;
+        div.innerHTML = `[${timestamp}] ${mensaje}`;
+        consola.appendChild(div);
+        consola.scrollTop = consola.scrollHeight; 
+    }
+
+    function limpiarLogs() {
+        document.getElementById('consola-logs').innerHTML = '<div class="log-entry log-info">[SISTEMA] Logs limpiados.</div>';
+    }
+
+    const firebaseConfig = { databaseURL: "https://superpote-e3dc4-default-rtdb.firebaseio.com/" };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const rtdb = firebase.database();
+
+    rtdb.ref('.info/connected').on('value', function(snap) {
+        let el = document.getElementById('estado-conexion');
+        if (snap.val() === true) {
+            el.style.background = '#22c55e';
+            el.style.color = 'white';
+            el.innerText = '🟢 Conectado a Firebase en tiempo real';
+            registrarLog("Conexión establecida con Firebase.", "success");
+        } else {
+            el.style.background = '#ef4444';
+            el.style.color = 'white';
+            el.innerText = '🔴 Desconectado de Firebase (Reconectando...)';
+            registrarLog("Pérdida de conexión con Firebase.", "error");
+        }
+    });
+
+    // --- CONTROL DE SESIÓN, PERSISTENCIA E INACTIVIDAD (1 HORA) ---
+    let tiempoInactividad;
+    const TIEMPO_LIMITE_INACTIVIDAD = 60 * 60 * 1000; // 1 hora en milisegundos
+
+    function reiniciarTemporizadorInactividad() {
+        clearTimeout(tiempoInactividad);
+        tiempoInactividad = setTimeout(() => {
+            sessionStorage.removeItem('adminAutenticado');
+            registrarLog("⚠️ Sesión expirada por 1 hora de inactividad.", "error");
+            alert("⚠️ La sesión ha expirado por una hora de inactividad. Por favor, inicia sesión nuevamente.");
+            location.reload();
+        }, TIEMPO_LIMITE_INACTIVIDAD);
+    }
+
+    // Registrar eventos de interacción para medir la inactividad del admin
+    ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evento => {
+        window.addEventListener(evento, reiniciarTemporizadorInactividad);
+    });
+
+    async function verificarAcceso(desdeSesionPrevia = false) {
+        let passIngresada = desdeSesionPrevia ? sessionStorage.getItem('adminAutenticado') : document.getElementById('pass-admin').value;
+        if(!passIngresada) return;
+
+        try {
+            let snapshot = await rtdb.ref('sistema/config/passAdmin').once('value');
+            let passReal = snapshot.val(); 
+
+            if(passReal && passIngresada === passReal) {
+                // Guardamos en sessionStorage para resistir refrescos (F5) sin cerrar sesión
+                sessionStorage.setItem('adminAutenticado', passIngresada);
+                
+                document.getElementById('login-admin').style.display = 'none';
+                document.getElementById('contenido-admin').style.display = 'block';
+                
+                if (!desdeSesionPrevia) {
+                    registrarLog("Acceso concedido al Panel Maestro.", "success");
+                } else {
+                    registrarLog("Sesión restaurada automáticamente tras refrescar la página.", "info");
+                }
+                
+                inicializarPanel();
+                setTimeout(inicializarGrafico, 200);
+                reiniciarTemporizadorInactividad(); // Activamos el temporizador de inactividad
+            } else { 
+                if(!desdeSesionPrevia) {
+                    registrarLog("Intento de acceso denegado: Contraseña incorrecta.", "error");
+                    alert("❌ Acceso Denegado: Contraseña incorrecta");
+                }
+                sessionStorage.removeItem('adminAutenticado');
+            }
+        } catch (error) {
+            registrarLog("Error de conexión con la base de datos al autenticar.", "error");
+            if(!desdeSesionPrevia) alert("Error de conexión con la base de datos.");
+        }
+    }
+
+    // Al cargar la página, verificamos automáticamente si ya existe una sesión activa previa
+    window.addEventListener('DOMContentLoaded', () => {
+        if (sessionStorage.getItem('adminAutenticado')) {
+            registrarLog("Detectada sesión previa en caché. Restaurando acceso...", "info");
+            verificarAcceso(true);
+        } else {
+            registrarLog("Esperando credenciales de acceso maestro...", "info");
+        }
+    });
+
+    function inicializarPanel() {
+        registrarLog("Inicializando escuchas del panel en tiempo real...");
+
+        rtdb.ref('sistema/global/pote').on('value', s => {
+            let val = s.val() || 0;
+            document.getElementById('stat-pote').innerText = val.toLocaleString() + " Bs";
+        });
+
+        rtdb.ref('sistema/global/bovedaCasa').on('value', s => {
+            let val = s.val() || 0;
+            document.getElementById('stat-boveda').innerText = val.toFixed(2) + " Bs";
+        });
+
+        rtdb.ref('sistema/usuarios').on('value', s => {
+            let count = 0;
+            const tablaUsuarios = document.getElementById('tabla-lista-usuarios');
+            tablaUsuarios.innerHTML = '';
+
+            if (s.exists()) {
+                s.forEach(c => {
+                    let userData = c.val();
+                    let uid = c.key;
+                    let isOnline = userData.online ? true : false;
+                    let saldo = userData.saldo !== undefined ? userData.saldo : 0;
+                    if (isOnline) count++;
+
+                    let tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><b>${uid}</b></td>
+                        <td><span class="badge-estado ${isOnline ? 'badge-online' : 'badge-offline'}">${isOnline ? 'ONLINE' : 'OFFLINE'}</span></td>
+                        <td><b style="color:var(--accent);">${saldo.toLocaleString()} Bs</b></td>
+                    `;
+                    tablaUsuarios.appendChild(tr);
+                });
+            } else {
+                tablaUsuarios.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#64748b;">No hay usuarios.</td></tr>';
+            }
+            document.getElementById('stat-online').innerText = count;
+        });
+
+        const sel = document.getElementById('select-ganador');
+        const items = ["Limón", "Coco", "Manzana", "Pera", "Cereza", "Durazno", "Kiwi", "Ciruela", "Mora", "Aguacate", "Perro", "Gato", "León", "Tigre", "Mono", "Oso", "Zorro", "Lobo", "Águila", "Loro", "Delfín", "Culebra", "Sapo", "Pez", "Toro", "Vaca", "Caballo", "Oveja", "Gallo", "Fresa"];
+        items.forEach((item, i) => sel.innerHTML += `<option value="${i}">${item}</option>`);
+
+        let primeraCargaSolicitudes = true;
+        rtdb.ref('sistema/depositos_pendientes').once('value', () => { primeraCargaSolicitudes = false; });
+
+        rtdb.ref('sistema/depositos_pendientes').on('value', snapshot => {
+            const contenedor = document.getElementById('lista-transacciones');
+            contenedor.innerHTML = '';
+            
+            if (snapshot.exists()) {
+                let total = 0;
+                snapshot.forEach(childSnap => {
+                    renderizarSolicitud(childSnap.key, childSnap.val());
+                    total++;
+                });
+                document.getElementById('contador-solicitudes').innerText = `(${total})`;
+            } else {
+                document.getElementById('contador-solicitudes').innerText = '(0)';
+                contenedor.innerHTML = '<p style="color:#64748b; text-align:center; font-size:0.75rem; margin:10px 0;">No hay solicitudes pendientes.</p>';
+            }
+        });
+
+        rtdb.ref('sistema/depositos_pendientes').on('child_added', (childSnap) => {
+            if (!primeraCargaSolicitudes) {
+                let d = childSnap.val();
+                reproducirAlertaSonora();
+                let nombreMostrar = d.nombre && d.nombre !== 'Usuario' ? d.nombre : (d.usuarioId ? d.usuarioId.split('_')[0].toUpperCase() : "USUARIO");
+                registrarLog(`🔔 Nueva solicitud de ${d.tipo || 'DEPÓSITO'} por ${d.monto} Bs | Banco: <b style="color:#38bdf8;">${d.banco || 'N/A'}</b> | Ref: <b style="color:#eab308;">${d.referencia || 'S/N'}</b> (${nombreMostrar})`, "success");
+            }
+        });
+    }
+
+    function renderizarSolicitud(key, d) {
+        if (!d) return;
+        let contenedor = document.getElementById('lista-transacciones');
+        let nombreMostrar = d.nombre;
+        if (!nombreMostrar || nombreMostrar === 'Usuario Anónimo' || nombreMostrar === 'Usuario') {
+            nombreMostrar = d.usuarioId ? d.usuarioId.split('_')[0].toUpperCase() : "USUARIO";
+        }
+
+        let div = document.createElement('div');
+        div.className = 'card';
+        div.style.marginBottom = '6px';
+        div.style.padding = '8px';
+        div.style.background = '#020617';
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <p style="margin:0; font-size:0.75rem;"><b>${d.tipo || 'DEPÓSITO'}</b> - <b style="color:var(--accent);">${nombreMostrar}</b></p>
+                    <p style="margin:0; font-size:0.7rem;">Monto: <b>${d.monto} Bs</b></p>
+                    <!-- ⚡ CAMPO BANCO INTEGRADO VISUALMENTE -->
+                    <p style="margin:0; font-size:0.7rem; color:#38bdf8;">Banco: <b>${d.banco || 'No especificado'}</b></p>
+                    <p style="margin:0; font-size:0.7rem; color:#eab308;">Ref Banco: <b>${d.referencia || 'S/N'}</b></p>
+                </div>
+                <div>
+                    <button onclick="procesar('${key}', '${d.usuarioId}', ${d.monto}, '${d.tipo}', true)" class="btn-accion" style="background:#22c55e; font-size:0.65rem; padding:4px 6px;">✔</button>
+                    <button onclick="procesar('${key}', '${d.usuarioId}', ${d.monto}, '${d.tipo}', false)" class="btn-accion" style="background:#ef4444; font-size:0.65rem; padding:4px 6px;">✖</button>
+                </div>
+            </div>
+        `;
+        contenedor.appendChild(div);
+    }
+
+    async function procesar(key, uid, monto, tipo, aprobar) {
+        if (!aprobar && !confirm("¿Rechazar solicitud?")) return;
+        try {
+            if (aprobar) {
+                if (tipo === 'DEPOSITAR') {
+                    await rtdb.ref(`sistema/usuarios/${uid}/saldo`).transaction(s => (s || 0) + monto);
+                }
+                registrarLog(`Depósito de ${monto} Bs aprobado para ${uid}.`, "success");
+            } else {
+                registrarLog(`Solicitud ${key} rechazada.`, "info");
+            }
+            await rtdb.ref(`sistema/depositos_pendientes/${key}`).remove();
+        } catch (err) {
+            registrarLog("Error al procesar: " + err.message, "error");
+        }
+    }
+
+    function forzarGiro(manual) {
+        let indice = manual ? document.getElementById('select-ganador').value : Math.floor(Math.random()*30);
+        registrarLog(`Giro ordenado [${manual ? 'Manual' : 'Aleatorio'}]. Índice: ${indice}`, "info");
+        rtdb.ref('sistema/global/comandoGiro').set({ estado: "girando", indiceGanador: parseInt(indice), forzadoManual: true });
+        alert("¡Giro ordenado con éxito!");
+    }
+</script>
+</body>
+</html>
